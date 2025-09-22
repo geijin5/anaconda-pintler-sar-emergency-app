@@ -32,15 +32,33 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-// Add web-specific resolver for react-native-maps
+// Configure platform-specific resolution
 config.resolver.platforms = ['ios', 'android', 'native', 'web'];
-config.resolver.alias = {
-  ...config.resolver.alias,
-  'react-native-maps': path.resolve(__dirname, 'web-stubs/react-native-maps.js'),
-};
 
-// Handle web platform resolution
+// Handle platform-specific extensions
+config.resolver.sourceExts = [...config.resolver.sourceExts, 'web.js', 'web.ts', 'web.tsx'];
+
+// Configure resolver for better web compatibility
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
+
+// Add custom resolver to handle react-native-maps on web
+const originalResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  // Handle react-native-maps on web platform
+  if (platform === 'web' && moduleName === 'react-native-maps') {
+    return {
+      filePath: path.resolve(__dirname, 'web-stubs/react-native-maps.js'),
+      type: 'sourceFile',
+    };
+  }
+  
+  // Use default resolver for other cases
+  if (originalResolveRequest) {
+    return originalResolveRequest(context, moduleName, platform);
+  }
+  
+  return context.resolveRequest(context, moduleName, platform);
+};
 
 module.exports = config;
 EOF

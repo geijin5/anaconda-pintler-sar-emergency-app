@@ -1,4 +1,4 @@
-// Native MapView component - only used on mobile platforms
+// Cross-platform MapView component
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet,
@@ -6,11 +6,21 @@ import {
   Text,
   TouchableOpacity,
   Alert,
+  Platform,
 } from 'react-native';
 import { Navigation2 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { EmergencyZone } from '@/types/emergency';
-import NativeMapView from './NativeMapView';
+
+// Platform-specific imports
+let NativeMapView: any = null;
+let WebMapView: any = null;
+
+if (Platform.OS !== 'web') {
+  NativeMapView = require('./NativeMapView').default;
+} else {
+  WebMapView = require('./WebMapView').default;
+}
 
 interface MapViewProps {
   zones: EmergencyZone[];
@@ -96,9 +106,12 @@ export default function MapView({ zones, onZonePress, selectedZone }: MapViewPro
     requestLocationPermission,
   };
 
+  // Render platform-specific map component
+  const MapComponent = Platform.OS === 'web' ? WebMapView : NativeMapView;
+  
   return (
     <View style={styles.container}>
-      <NativeMapView {...mapProps} />
+      {MapComponent && <MapComponent {...mapProps} />}
       
       <TouchableOpacity 
         style={[

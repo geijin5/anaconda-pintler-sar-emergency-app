@@ -49,9 +49,28 @@ export default function MapView({ zones, onZonePress, selectedZone }: MapViewPro
               console.log('Web location obtained:', location.coords);
             },
             (error) => {
-              console.error('Web geolocation error:', error);
+              let errorMessage = 'Unknown geolocation error';
+              switch (error.code) {
+                case error.PERMISSION_DENIED:
+                  errorMessage = 'Location access denied by user';
+                  setLocationPermission(Location.PermissionStatus.DENIED);
+                  break;
+                case error.POSITION_UNAVAILABLE:
+                  errorMessage = 'Location information unavailable';
+                  break;
+                case error.TIMEOUT:
+                  errorMessage = 'Location request timed out';
+                  break;
+                default:
+                  errorMessage = `Geolocation error: ${error.message || 'Unknown error'}`;
+              }
+              console.error('Web geolocation error:', errorMessage);
             },
-            { enableHighAccuracy: true }
+            { 
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 60000
+            }
           );
         }
       } else {

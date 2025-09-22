@@ -40,6 +40,10 @@ jobs:
         ndk-version: 25.1.8937393
         cmake-version: 3.22.1
         
+    - name: Accept Android SDK licenses
+      run: |
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        
     - name: Cache Bun dependencies
       uses: actions/cache@v4
       with:
@@ -70,18 +74,34 @@ jobs:
         echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
         echo "PATH=$PATH:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools" >> $GITHUB_ENV
         
-    - name: Accept Android SDK licenses
-      run: |
-        mkdir -p $ANDROID_HOME/licenses
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
-        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $ANDROID_HOME/licenses/android-sdk-license
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-preview-license
+
       
     - name: Clean previous builds
       run: |
         rm -rf android
         rm -rf .expo
         rm -rf node_modules/.cache
+        
+    - name: Create metro config for web compatibility
+      run: |
+        cat > metro.config.js << 'EOF'
+        const { getDefaultConfig } = require('expo/metro-config');
+        const path = require('path');
+        
+        const config = getDefaultConfig(__dirname);
+        
+        // Add web-specific resolver for react-native-maps
+        config.resolver.platforms = ['ios', 'android', 'native', 'web'];
+        config.resolver.alias = {
+          ...config.resolver.alias,
+          'react-native-maps': path.resolve(__dirname, 'web-stubs/react-native-maps.js'),
+        };
+        
+        // Handle web platform resolution
+        config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
+        
+        module.exports = config;
+        EOF
         
     - name: Make prebuild script executable
       run: chmod +x scripts/prebuild.sh
@@ -94,12 +114,13 @@ jobs:
         EXPO_NO_TELEMETRY: 1
         EXPO_NO_FLIPPER: 1
         
-    - name: Install Android dependencies
+    - name: Verify Android directory exists
       run: |
-        cd android
-        if [ -f "package.json" ]; then
-          bun install
+        if [ ! -d "android" ]; then
+          echo "Error: android directory not found after prebuild"
+          exit 1
         fi
+        echo "Android directory exists, proceeding with build..."
       
     - name: Cache Gradle
       uses: actions/cache@v4
@@ -118,8 +139,10 @@ jobs:
     - name: Build APK
       run: |
         cd android
-        export GRADLE_OPTS="-Xmx3g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dorg.gradle.jvmargs=-Xmx3g"
-        ./gradlew assembleRelease --no-daemon --stacktrace --info --build-cache
+        export GRADLE_OPTS="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError"
+        export JAVA_OPTS="-Xmx4g"
+        ./gradlew clean
+        ./gradlew assembleRelease --no-daemon --stacktrace --build-cache --parallel
       env:
         ANDROID_HOME: ${{ env.ANDROID_HOME }}
         ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
@@ -135,8 +158,9 @@ jobs:
     - name: Build AAB (for Play Store)
       run: |
         cd android
-        export GRADLE_OPTS="-Xmx3g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dorg.gradle.jvmargs=-Xmx3g"
-        ./gradlew bundleRelease --no-daemon --stacktrace --info --build-cache
+        export GRADLE_OPTS="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError"
+        export JAVA_OPTS="-Xmx4g"
+        ./gradlew bundleRelease --no-daemon --stacktrace --build-cache --parallel
       env:
         ANDROID_HOME: ${{ env.ANDROID_HOME }}
         ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}

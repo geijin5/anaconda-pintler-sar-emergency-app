@@ -12,6 +12,23 @@ import {
 import { MapPin, Navigation2, MapPinned } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { EmergencyZone } from '@/types/emergency';
+// Conditional import for react-native-maps to handle web compatibility
+let RNMapView: any = null;
+let Marker: any = null;
+let Circle: any = null;
+let PROVIDER_GOOGLE: any = null;
+
+if (Platform.OS !== 'web') {
+  try {
+    const maps = require('react-native-maps');
+    RNMapView = maps.default;
+    Marker = maps.Marker;
+    Circle = maps.Circle;
+    PROVIDER_GOOGLE = maps.PROVIDER_GOOGLE;
+  } catch {
+    console.log('react-native-maps not available on this platform');
+  }
+}
 
 interface MapViewProps {
   zones: EmergencyZone[];
@@ -192,89 +209,165 @@ export default function MapView({ zones, onZonePress, selectedZone }: MapViewPro
     }
   };
 
+  // Default region (Montana area)
+  const defaultRegion = {
+    latitude: 46.0059,
+    longitude: -112.5362,
+    latitudeDelta: 0.5,
+    longitudeDelta: 0.5,
+  };
+
+  // Convert zone coordinates to lat/lng (mock conversion for demo)
+  const convertZoneCoordinates = (zone: EmergencyZone) => {
+    return {
+      latitude: defaultRegion.latitude + (zone.coordinates.y - 0.5) * 0.1,
+      longitude: defaultRegion.longitude + (zone.coordinates.x - 0.5) * 0.1,
+    };
+  };
+
+  const getZoneColorHex = (status: string) => {
+    switch (status) {
+      case 'active':
+        return '#DC2626';
+      case 'caution':
+        return '#F59E0B';
+      case 'clear':
+        return '#10B981';
+      default:
+        return '#6B7280';
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.mapContainer}>
-        <View style={styles.mapBackground}>
-          <Text style={styles.mapTitle}>Emergency Response Map</Text>
-          <Text style={styles.mapSubtitle}>
-            {(Platform.OS as string) === 'web' 
-              ? 'Interactive emergency zones - Web version' 
-              : 'Interactive emergency zones - Mobile version'
-            }
-          </Text>
-          
-          {zones.map((zone) => {
-            const isSelected = selectedZone?.id === zone.id;
-            const isActive = zone.status === 'active';
+        {Platform.OS !== 'web' ? (
+          <RNMapView
+            style={styles.map}
+            provider={PROVIDER_GOOGLE}
+            initialRegion={defaultRegion}
+            region={currentLocation ? {
+              latitude: currentLocation.coords.latitude,
+              longitude: currentLocation.coords.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            } : defaultRegion}
+            showsUserLocation={true}
+            showsMyLocationButton={false}
+            showsCompass={true}
+            showsScale={true}
+            mapType="standard"
+          >
+            {/* Emergency zones */}
+            {zones.map((zone) => {
+              const zoneCoords = convertZoneCoordinates(zone);
+              return (
+                <React.Fragment key={zone.id}>
+                  <Circle
+                    center={zoneCoords}
+                    radius={zone.radius * 100} // Convert to meters
+                    fillColor={getZoneColor(zone.status, 0.3)}
+                    strokeColor={getZoneColorHex(zone.status)}
+                    strokeWidth={2}
+                  />
+                  <Marker
+                    coordinate={zoneCoords}
+                    onPress={() => onZonePress(zone)}
+                    title={zone.name}
+                    description={`Status: ${zone.status}`}
+                  >
+                    <View style={[
+                      styles.markerContainer,
+                      { backgroundColor: getZoneColorHex(zone.status) },
+                      selectedZone?.id === zone.id && styles.selectedMarker
+                    ]}>
+                      <MapPin size={16} color="#fff" />
+                    </View>
+                  </Marker>
+                </React.Fragment>
+              );
+            })}
+          </RNMapView>
+        ) : (
+          // Web fallback
+          <View style={styles.webMapFallback}>
+            <Text style={styles.mapTitle}>Emergency Response Map</Text>
+            <Text style={styles.mapSubtitle}>
+              Google Maps - Web version (requires API key)
+            </Text>
             
-            return (
-              <TouchableOpacity
-                key={zone.id}
+            {zones.map((zone) => {
+              const isSelected = selectedZone?.id === zone.id;
+              const isActive = zone.status === 'active';
+              
+              return (
+                <TouchableOpacity
+                  key={zone.id}
+                  style={[
+                    styles.zone,
+                    {
+                      left: zone.coordinates.x * width * 0.8 + width * 0.1,
+                      top: zone.coordinates.y * height * 0.6 + 100,
+                      width: zone.radius * 1.5,
+                      height: zone.radius * 1.5,
+                      backgroundColor: getZoneColor(zone.status),
+                      borderColor: getZoneColor(zone.status, 0.8),
+                      borderWidth: isSelected ? 3 : 2,
+                      transform: [{ scale: isSelected ? 1.1 : 1 }],
+                    },
+                  ]}
+                  onPress={() => onZonePress(zone)}
+                  activeOpacity={0.8}
+                  testID={`zone-${zone.id}`}
+                >
+                  {isActive && (
+                    <Animated.View
+                      style={[
+                        styles.pulseCircle,
+                        {
+                          backgroundColor: getZoneColor(zone.status, 0.2),
+                          transform: [{ scale: pulseAnim }],
+                        },
+                      ]}
+                    />
+                  )}
+                  <View style={[styles.zoneCenter, { backgroundColor: getZoneColor(zone.status, 1) }]}>
+                    <MapPin size={12} color="#fff" />
+                  </View>
+                  {isSelected && (
+                    <View style={styles.zoneLabel}>
+                      <Text style={styles.zoneLabelText}>{zone.name}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+            
+            {/* Current location indicator */}
+            {currentLocation && (
+              <View
                 style={[
-                  styles.zone,
+                  styles.currentLocationMarker,
                   {
-                    left: zone.coordinates.x * width * 0.8 + width * 0.1,
-                    top: zone.coordinates.y * height * 0.6 + 100,
-                    width: zone.radius * 1.5,
-                    height: zone.radius * 1.5,
-                    backgroundColor: getZoneColor(zone.status),
-                    borderColor: getZoneColor(zone.status, 0.8),
-                    borderWidth: isSelected ? 3 : 2,
-                    transform: [{ scale: isSelected ? 1.1 : 1 }],
+                    left: width * 0.5 - 12,
+                    top: height * 0.4 - 12,
                   },
                 ]}
-                onPress={() => onZonePress(zone)}
-                activeOpacity={0.8}
-                testID={`zone-${zone.id}`}
               >
-                {isActive && (
+                <View style={styles.currentLocationPulse}>
                   <Animated.View
                     style={[
-                      styles.pulseCircle,
-                      {
-                        backgroundColor: getZoneColor(zone.status, 0.2),
-                        transform: [{ scale: pulseAnim }],
-                      },
+                      styles.currentLocationPulseRing,
+                      { transform: [{ scale: pulseAnim }] },
                     ]}
                   />
-                )}
-                <View style={[styles.zoneCenter, { backgroundColor: getZoneColor(zone.status, 1) }]}>
-                  <MapPin size={12} color="#fff" />
                 </View>
-                {isSelected && (
-                  <View style={styles.zoneLabel}>
-                    <Text style={styles.zoneLabelText}>{zone.name}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-          
-          {/* Current location indicator */}
-          {currentLocation && (
-            <View
-              style={[
-                styles.currentLocationMarker,
-                {
-                  left: width * 0.5 - 12,
-                  top: height * 0.4 - 12,
-                },
-              ]}
-            >
-              <View style={styles.currentLocationPulse}>
-                <Animated.View
-                  style={[
-                    styles.currentLocationPulseRing,
-                    { transform: [{ scale: pulseAnim }] },
-                  ]}
-                />
+                <MapPinned size={24} color="#1E3A8A" />
+                <Text style={styles.currentLocationText}>You are here</Text>
               </View>
-              <MapPinned size={24} color="#1E3A8A" />
-              <Text style={styles.currentLocationText}>You are here</Text>
-            </View>
-          )}
-        </View>
+            )}
+          </View>
+        )}
       </View>
       
       <TouchableOpacity 
@@ -325,6 +418,33 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
     backgroundColor: '#F0F4E8',
+  },
+  map: {
+    flex: 1,
+  },
+  webMapFallback: {
+    flex: 1,
+    backgroundColor: '#E8F4F8',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  markerContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  selectedMarker: {
+    borderWidth: 3,
+    borderColor: '#fff',
+    transform: [{ scale: 1.2 }],
   },
   mapBackground: {
     flex: 1,

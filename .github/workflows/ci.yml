@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
+        
+    - name: Install dependencies
+      run: bun install
+      
+    - name: Run linter
+      run: bun run lint
+      continue-on-error: true
+      
+    - name: Type check
+      run: bunx tsc --noEmit
+      
+    - name: Test Expo export
+      run: |
+        bun add -g @expo/cli
+        bunx expo export --platform web --output-dir test-build
+        
+    - name: Upload test build
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-web-build
+        path: test-build/
+        retention-days: 7

@@ -25,6 +25,7 @@ export default function MapView({ zones, onZonePress, selectedZone }: MapViewPro
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
   const [locationPermission, setLocationPermission] = useState<Location.PermissionStatus | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const getCurrentLocation = useCallback(async () => {
     try {
@@ -52,19 +53,23 @@ export default function MapView({ zones, onZonePress, selectedZone }: MapViewPro
               let errorMessage = 'Unknown geolocation error';
               switch (error.code) {
                 case error.PERMISSION_DENIED:
-                  errorMessage = 'Location access denied by user';
+                  errorMessage = 'Location access denied. Please enable location permissions in your browser settings.';
                   setLocationPermission(Location.PermissionStatus.DENIED);
+                  setLocationError(errorMessage);
                   break;
                 case error.POSITION_UNAVAILABLE:
-                  errorMessage = 'Location information unavailable';
+                  errorMessage = 'Location information is currently unavailable. Please try again later.';
+                  setLocationError(errorMessage);
                   break;
                 case error.TIMEOUT:
-                  errorMessage = 'Location request timed out';
+                  errorMessage = 'Location request timed out. Please try again.';
+                  setLocationError(errorMessage);
                   break;
                 default:
-                  errorMessage = `Geolocation error: ${error.message || 'Unknown error'}`;
+                  errorMessage = `Unable to get location: ${error.message || 'Unknown error'}`;
+                  setLocationError(errorMessage);
               }
-              console.error('Web geolocation error:', errorMessage);
+              console.log('Location access issue:', errorMessage);
             },
             { 
               enableHighAccuracy: true,
@@ -150,21 +155,40 @@ export default function MapView({ zones, onZonePress, selectedZone }: MapViewPro
   };
 
   const handleLocationPress = async () => {
-    if (locationPermission !== 'granted') {
-      Alert.alert(
-        'Location Permission Required',
-        'Please enable location permissions to use this feature.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Settings', onPress: requestLocationPermission },
-        ]
-      );
+    setLocationError(null);
+    
+    if (locationPermission === Location.PermissionStatus.DENIED) {
+      if (Platform.OS === 'web') {
+        Alert.alert(
+          'Location Access Required',
+          'Location access was denied. To enable location:\n\n1. Click the location icon in your browser\'s address bar\n2. Select "Allow" for location access\n3. Refresh the page if needed',
+          [
+            { text: 'OK', style: 'default' },
+            { text: 'Try Again', onPress: requestLocationPermission },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Location Permission Required',
+          'Please enable location permissions in your device settings to use this feature.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Try Again', onPress: requestLocationPermission },
+          ]
+        );
+      }
+      return;
+    }
+
+    if (locationPermission !== Location.PermissionStatus.GRANTED) {
+      await requestLocationPermission();
       return;
     }
 
     try {
       await getCurrentLocation();
-    } catch {
+    } catch (error) {
+      console.error('Location error:', error);
       Alert.alert('Error', 'Unable to get your current location. Please try again.');
     }
   };
@@ -257,16 +281,38 @@ export default function MapView({ zones, onZonePress, selectedZone }: MapViewPro
       <TouchableOpacity 
         style={[
           styles.locationButton,
-          locationPermission === 'granted' && currentLocation && styles.locationButtonActive
+          locationPermission === Location.PermissionStatus.GRANTED && currentLocation && styles.locationButtonActive,
+          locationPermission === Location.PermissionStatus.DENIED && styles.locationButtonDenied
         ]}
         onPress={handleLocationPress}
         testID="location-button"
       >
         <Navigation2 
           size={20} 
-          color={locationPermission === 'granted' && currentLocation ? '#10B981' : '#1E3A8A'} 
+          color={
+            locationPermission === Location.PermissionStatus.GRANTED && currentLocation 
+              ? '#10B981' 
+              : locationPermission === Location.PermissionStatus.DENIED 
+              ? '#DC2626' 
+              : '#1E3A8A'
+          } 
         />
       </TouchableOpacity>
+      
+      {locationError && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{locationError}</Text>
+          <TouchableOpacity 
+            style={styles.errorButton}
+            onPress={() => {
+              setLocationError(null);
+              requestLocationPermission();
+            }}
+          >
+            <Text style={styles.errorButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -363,6 +409,47 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
     borderWidth: 2,
     borderColor: '#10B981',
+  },
+  locationButtonDenied: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 2,
+    borderColor: '#DC2626',
+  },
+  errorBanner: {
+    position: 'absolute',
+    bottom: 80,
+    left: 20,
+    right: 20,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#DC2626',
+    marginRight: 12,
+  },
+  errorButton: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  errorButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   currentLocationMarker: {
     position: 'absolute',

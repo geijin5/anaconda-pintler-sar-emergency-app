@@ -1,16 +1,15 @@
-// Native MapView component - only used on mobile platforms
+// Web-specific MapView component
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { Navigation2 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { EmergencyZone } from '@/types/emergency';
-import NativeMapView from './NativeMapView';
+import WebMapView from './WebMapView';
 
 interface MapViewProps {
   zones: EmergencyZone[];
@@ -25,12 +24,54 @@ export default function MapView({ zones, onZonePress, selectedZone }: MapViewPro
 
   const getCurrentLocation = useCallback(async () => {
     try {
-      // Use expo-location for native
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      setCurrentLocation(location);
-      console.log('Native location obtained:', location.coords);
+      // Use web geolocation API
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const location = {
+              coords: {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                altitude: position.coords.altitude,
+                accuracy: position.coords.accuracy,
+                altitudeAccuracy: position.coords.altitudeAccuracy,
+                heading: position.coords.heading,
+                speed: position.coords.speed,
+              },
+              timestamp: position.timestamp,
+            } as Location.LocationObject;
+            setCurrentLocation(location);
+            console.log('Web location obtained:', location.coords);
+          },
+          (error) => {
+            let errorMessage = 'Unknown geolocation error';
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                errorMessage = 'Location access denied. Please enable location permissions in your browser settings.';
+                setLocationPermission(Location.PermissionStatus.DENIED);
+                setLocationError(errorMessage);
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMessage = 'Location information is currently unavailable. Please try again later.';
+                setLocationError(errorMessage);
+                break;
+              case error.TIMEOUT:
+                errorMessage = 'Location request timed out. Please try again.';
+                setLocationError(errorMessage);
+                break;
+              default:
+                errorMessage = `Unable to get location: ${error.message || 'Unknown error'}`;
+                setLocationError(errorMessage);
+            }
+            console.log('Location access issue:', errorMessage);
+          },
+          { 
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000
+          }
+        );
+      }
     } catch (error) {
       console.error('Error getting current location:', error);
     }
@@ -38,14 +79,13 @@ export default function MapView({ zones, onZonePress, selectedZone }: MapViewPro
 
   const requestLocationPermission = useCallback(async () => {
     try {
-      // Use expo-location for native
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      setLocationPermission(status);
-      
-      if (status === 'granted') {
+      // For web, check if geolocation is available
+      if ('geolocation' in navigator) {
+        setLocationPermission(Location.PermissionStatus.GRANTED);
         getCurrentLocation();
       } else {
-        console.log('Location permission denied');
+        setLocationPermission(Location.PermissionStatus.DENIED);
+        console.log('Geolocation not available in this browser');
       }
     } catch (error) {
       console.error('Error requesting location permission:', error);
@@ -60,14 +100,7 @@ export default function MapView({ zones, onZonePress, selectedZone }: MapViewPro
     setLocationError(null);
     
     if (locationPermission === Location.PermissionStatus.DENIED) {
-      Alert.alert(
-        'Location Permission Required',
-        'Please enable location permissions in your device settings to use this feature.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Try Again', onPress: requestLocationPermission },
-        ]
-      );
+      console.log('Location permission denied - showing instructions');
       return;
     }
 
@@ -80,7 +113,6 @@ export default function MapView({ zones, onZonePress, selectedZone }: MapViewPro
       await getCurrentLocation();
     } catch (error) {
       console.error('Location error:', error);
-      Alert.alert('Error', 'Unable to get your current location. Please try again.');
     }
   };
 
@@ -98,7 +130,7 @@ export default function MapView({ zones, onZonePress, selectedZone }: MapViewPro
 
   return (
     <View style={styles.container}>
-      <NativeMapView {...mapProps} />
+      <WebMapView {...mapProps} />
       
       <TouchableOpacity 
         style={[
@@ -145,7 +177,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F4E8',
     position: 'relative',
   },
-
   locationButton: {
     position: 'absolute',
     bottom: 20,
@@ -206,7 +237,6 @@ const styles = StyleSheet.create({
   errorButtonText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '600' as const,
   },
-
 });

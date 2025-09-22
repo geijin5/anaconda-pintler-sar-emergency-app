@@ -36,7 +36,7 @@ jobs:
       
     - name: Test Expo export
       run: |
-        bun add -g @expo/cli
+        bun add --global @expo/cli
         bunx expo export --platform web --output-dir test-build
         
     - name: Upload test build

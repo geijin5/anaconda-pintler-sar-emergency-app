@@ -20,7 +20,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: 'npm'
         
     - name: Setup Bun
       uses: oven-sh/setup-bun@v1
@@ -41,7 +40,7 @@ jobs:
         ndk-version: 25.1.8937393
         cmake-version: 3.22.1
         
-    - name: Cache dependencies
+    - name: Cache Bun dependencies
       uses: actions/cache@v4
       with:
         path: ~/.bun/install/cache
@@ -50,10 +49,10 @@ jobs:
           ${{ runner.os }}-bun-
           
     - name: Install dependencies
-      run: bun install --frozen-lockfile
+      run: bun install
       
     - name: Setup Expo CLI
-      run: bun add -g @expo/cli
+      run: bun add --global @expo/cli
       
     - name: Cache Expo prebuild
       uses: actions/cache@v4
@@ -72,12 +71,17 @@ jobs:
         echo "PATH=$PATH:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools" >> $GITHUB_ENV
         
     - name: Accept Android SDK licenses
-      run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+      run: |
+        mkdir -p $ANDROID_HOME/licenses
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
+        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $ANDROID_HOME/licenses/android-sdk-license
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-preview-license
       
     - name: Prebuild Android
-      run: bunx expo prebuild --platform android --clean --no-install
+      run: bunx expo prebuild --platform android --clean
       env:
         EXPO_NO_DOTENV: 1
+        CI: 1
       
     - name: Cache Gradle
       uses: actions/cache@v4
@@ -96,12 +100,12 @@ jobs:
     - name: Build APK
       run: |
         cd android
-        # Set Gradle JVM options for better performance
-        export GRADLE_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
-        ./gradlew assembleRelease --no-daemon --stacktrace --info
+        export GRADLE_OPTS="-Xmx3g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dorg.gradle.jvmargs=-Xmx3g"
+        ./gradlew assembleRelease --no-daemon --stacktrace --info --build-cache
       env:
         ANDROID_HOME: ${{ env.ANDROID_HOME }}
         ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
+        CI: true
         
     - name: Upload APK
       uses: actions/upload-artifact@v4
@@ -113,12 +117,12 @@ jobs:
     - name: Build AAB (for Play Store)
       run: |
         cd android
-        # Set Gradle JVM options for better performance
-        export GRADLE_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
-        ./gradlew bundleRelease --no-daemon --stacktrace --info
+        export GRADLE_OPTS="-Xmx3g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dorg.gradle.jvmargs=-Xmx3g"
+        ./gradlew bundleRelease --no-daemon --stacktrace --info --build-cache
       env:
         ANDROID_HOME: ${{ env.ANDROID_HOME }}
         ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
+        CI: true
         
     - name: Upload AAB
       uses: actions/upload-artifact@v4

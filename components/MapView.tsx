@@ -13,6 +13,20 @@ import { MapPin, Navigation2, MapPinned } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { EmergencyZone } from '@/types/emergency';
 
+// Conditional import for react-native-maps (only on native platforms)
+let MapViewNative: any = null;
+let MarkerNative: any = null;
+
+if (Platform.OS !== 'web') {
+  try {
+    const Maps = require('react-native-maps');
+    MapViewNative = Maps.default;
+    MarkerNative = Maps.Marker;
+  } catch (error) {
+    console.log('react-native-maps not available:', error);
+  }
+}
+
 const { width, height } = Dimensions.get('window');
 
 interface MapViewProps {

@@ -83,16 +83,16 @@ jobs:
         rm -rf .expo
         rm -rf node_modules/.cache
         
+    - name: Make prebuild script executable
+      run: chmod +x scripts/prebuild.sh
+      
     - name: Prebuild Android
-      run: |
-        export EXPO_NO_TELEMETRY=1
-        export EXPO_NO_DOTENV=1
-        export CI=1
-        bunx expo prebuild --platform android --clean --no-install
+      run: ./scripts/prebuild.sh android
       env:
         EXPO_NO_DOTENV: 1
         CI: 1
         EXPO_NO_TELEMETRY: 1
+        EXPO_NO_FLIPPER: 1
         
     - name: Install Android dependencies
       run: |

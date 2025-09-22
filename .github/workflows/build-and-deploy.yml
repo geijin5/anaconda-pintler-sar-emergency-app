@@ -73,10 +73,16 @@ jobs:
     - name: Setup Expo CLI
       run: bun add --global @expo/cli
       
+    - name: Make prebuild script executable
+      run: chmod +x scripts/prebuild.sh
+      
     - name: Prebuild Android
-      run: bunx expo prebuild --platform android --clean
+      run: ./scripts/prebuild.sh android
       env:
+        EXPO_NO_DOTENV: 1
         CI: 1
+        EXPO_NO_TELEMETRY: 1
+        EXPO_NO_FLIPPER: 1
       
     - name: Make gradlew executable
       run: chmod +x android/gradlew
@@ -135,10 +141,16 @@ jobs:
     - name: Setup Expo CLI
       run: bun add --global @expo/cli
       
+    - name: Make prebuild script executable
+      run: chmod +x scripts/prebuild.sh
+      
     - name: Prebuild iOS
-      run: bunx expo prebuild --platform ios --clean
+      run: ./scripts/prebuild.sh ios
       env:
+        EXPO_NO_DOTENV: 1
         CI: 1
+        EXPO_NO_TELEMETRY: 1
+        EXPO_NO_FLIPPER: 1
       
     - name: Setup Xcode
       uses: maxim-lobanov/setup-xcode@v1

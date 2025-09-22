@@ -3,6 +3,8 @@
 # Prebuild script for Android/iOS builds
 # This script helps handle react-native-maps compatibility issues
 
+set -e  # Exit on any error
+
 echo "Starting prebuild process..."
 
 # Set environment variables for better compatibility
@@ -11,6 +13,7 @@ export EXPO_NO_DOTENV=1
 export CI=1
 export EXPO_NO_FLIPPER=1
 export EXPO_USE_METRO_WORKSPACE_ROOT=1
+export NODE_ENV=production
 
 # Clean previous builds
 echo "Cleaning previous builds..."
@@ -18,7 +21,7 @@ rm -rf android ios .expo node_modules/.cache
 
 # Install dependencies
 echo "Installing dependencies..."
-bun install
+bun install --frozen-lockfile
 
 # Create metro.config.js if it doesn't exist to handle react-native-maps web compatibility
 if [ ! -f "metro.config.js" ]; then
@@ -46,11 +49,26 @@ fi
 # Run prebuild with error handling
 echo "Running Expo prebuild..."
 if [ "$1" = "android" ]; then
-    bunx expo prebuild --platform android --clean --no-install
+    echo "Prebuilding for Android..."
+    bunx expo prebuild --platform android --clean --no-install --skip-dependency-update
+    
+    # Verify android directory was created
+    if [ ! -d "android" ]; then
+        echo "ERROR: Android directory was not created by prebuild"
+        echo "Trying prebuild without --no-install flag..."
+        bunx expo prebuild --platform android --clean
+        
+        if [ ! -d "android" ]; then
+            echo "ERROR: Still no android directory. Prebuild failed."
+            exit 1
+        fi
+    fi
 elif [ "$1" = "ios" ]; then
-    bunx expo prebuild --platform ios --clean --no-install
+    echo "Prebuilding for iOS..."
+    bunx expo prebuild --platform ios --clean --no-install --skip-dependency-update
 else
-    bunx expo prebuild --clean --no-install
+    echo "Prebuilding for all platforms..."
+    bunx expo prebuild --clean --no-install --skip-dependency-update
 fi
 
 # Post-prebuild fixes for Android

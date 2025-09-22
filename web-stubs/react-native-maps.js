@@ -31,4 +31,8 @@ export const Circle = ({ ...props }) => null;
 export const Polygon = ({ ...props }) => null;
 export const Polyline = ({ ...props }) => null;
 
+// Export constants that react-native-maps uses
+export const PROVIDER_GOOGLE = 'google';
+export const PROVIDER_DEFAULT = 'default';
+
 export default MapView;

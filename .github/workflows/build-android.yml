@@ -153,7 +153,7 @@ jobs:
         if [ ! -d "android" ]; then
           echo "Error: android directory not found after prebuild"
           echo "Attempting manual prebuild..."
-          bunx expo prebuild --platform android --clean
+          bunx expo prebuild --platform android --clean --no-install
           if [ ! -d "android" ]; then
             echo "Manual prebuild also failed"
             exit 1

@@ -68,7 +68,7 @@ fi
 echo "Running Expo prebuild..."
 if [ "$1" = "android" ]; then
     echo "Prebuilding for Android..."
-    bunx expo prebuild --platform android --clean --no-install --skip-dependency-update
+    bunx expo prebuild --platform android --clean --no-install
     
     # Verify android directory was created
     if [ ! -d "android" ]; then
@@ -83,10 +83,10 @@ if [ "$1" = "android" ]; then
     fi
 elif [ "$1" = "ios" ]; then
     echo "Prebuilding for iOS..."
-    bunx expo prebuild --platform ios --clean --no-install --skip-dependency-update
+    bunx expo prebuild --platform ios --clean --no-install
 else
     echo "Prebuilding for all platforms..."
-    bunx expo prebuild --clean --no-install --skip-dependency-update
+    bunx expo prebuild --clean --no-install
 fi
 
 # Post-prebuild fixes for Android

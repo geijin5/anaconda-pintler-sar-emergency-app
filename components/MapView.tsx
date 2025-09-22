@@ -3,7 +3,7 @@ import {
   StyleSheet,
   View,
   Text,
-  Dimensions,
+  useWindowDimensions,
   TouchableOpacity,
   Animated,
   Platform,
@@ -13,22 +13,6 @@ import { MapPin, Navigation2, MapPinned } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { EmergencyZone } from '@/types/emergency';
 
-// Conditional import for react-native-maps (only on native platforms)
-let MapViewNative: any = null;
-let MarkerNative: any = null;
-
-if (Platform.OS !== 'web') {
-  try {
-    const Maps = require('react-native-maps');
-    MapViewNative = Maps.default;
-    MarkerNative = Maps.Marker;
-  } catch (error) {
-    console.log('react-native-maps not available:', error);
-  }
-}
-
-const { width, height } = Dimensions.get('window');
-
 interface MapViewProps {
   zones: EmergencyZone[];
   onZonePress: (zone: EmergencyZone) => void;
@@ -36,6 +20,7 @@ interface MapViewProps {
 }
 
 export default function MapView({ zones, onZonePress, selectedZone }: MapViewProps) {
+  const { width, height } = useWindowDimensions();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
   const [locationPermission, setLocationPermission] = useState<Location.PermissionStatus | null>(null);
